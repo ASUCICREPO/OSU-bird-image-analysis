@@ -8,29 +8,29 @@ This system allows users to upload bird images and receive automated counting an
 
 ## Development Iterations
 
-### Iteration 1: Basic Setup & Authentication ✅
+### Iteration 1: Basic Setup & Authentication 
 - Project scaffolding
 - AWS Amplify configuration
 - Clean React UI without authentication
 - Professional interface design
 
-### Iteration 2: File Upload & Storage ✅
+### Iteration 2: File Upload & Storage 
 - S3 bucket configuration with guest access
 - Real S3 file upload with progress tracking
 - Support for ZIP files and images
 - File validation and error handling
 
-### Iteration 3: Bird Counting with AI 📋
+### Iteration 3: Bird Counting with AI 
 - Lambda function for image processing
 - Claude AI integration for bird counting
 - CSV result generation
 
-### Iteration 4: Species Classification 📋
+### Iteration 4: Species Classification 
 - SageMaker integration
 - Species identification model
 - Enhanced CSV results
 
-### Iteration 5: Production Ready 📋
+### Iteration 5: Production Ready 
 - Error handling & monitoring
 - Performance optimization
 - Deployment automation
