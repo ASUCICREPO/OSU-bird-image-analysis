@@ -95,13 +95,22 @@ export ROLE_ARN=$(aws iam get-role --role-name SageMakerExecutionRole --query 'R
 
 ### 2.6: Create SageMaker Model
 ```bash
+# IMPORTANT: Create model in the SAME region as your deployment (us-west-2)
 aws sagemaker create-model \
   --model-name bird-species-detection-model-i107-fr-1l \
   --primary-container Image=$CONTAINER_IMAGE,ModelDataUrl=s3://$MODEL_BUCKET/models/bird-species-model.tar.gz \
   --execution-role-arn $ROLE_ARN \
   --profile test-account \
   --region us-west-2
+
+# Verify model was created
+aws sagemaker describe-model \
+  --model-name bird-species-detection-model-i107-fr-1l \
+  --profile test-account \
+  --region us-west-2
 ```
+
+**Note:** The model name and region will be used in Step 5 (.env configuration).
 
 ---
 
@@ -129,13 +138,17 @@ cd amplify && npm install && cd ..
 cp .env.example .env
 ```
 
-Edit `.env` file:
+Edit `.env` file with YOUR model details from Step 2.6:
 ```bash
 BEDROCK_REGION=us-west-2
 CLAUDE_MODEL_ID=global.anthropic.claude-sonnet-4-20250514-v1:0
+
+# Use the SAME model name and region from Step 2.6
 SAGEMAKER_MODEL_NAME=bird-species-detection-model-i107-fr-1l
 SAGEMAKER_REGION=us-west-2
 ```
+
+**CRITICAL:** Make sure SAGEMAKER_REGION matches where you created the model in Step 2.6!
 
 ---
 
