@@ -61,17 +61,12 @@ aws s3 cp model-files/model.tar.gz s3://bird-model-TIMESTAMP/models/bird-species
 export MODEL_BUCKET=bird-model-TIMESTAMP
 ```
 
-### 2.4: Get SageMaker Container Image
+### 2.4: Get SageMaker Container Image (This is the container image specifically for us-west-2 region)
 ```bash
 # For object detection models, use AWS pre-built container
 # Replace with your model's framework (pytorch, tensorflow, etc.)
-export CONTAINER_IMAGE="763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-inference:2.0.0-gpu-py310"
+export CONTAINER_IMAGE="433757028032.dkr.ecr.us-west-2.amazonaws.com/object-detection:1"
 ```
-
-**Common Container Images:**
-- PyTorch: `763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-inference:2.0.0-gpu-py310`
-- TensorFlow: `763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference:2.12.0-gpu-py310`
-- Custom: Use your own ECR image
 
 ### 2.5: Create SageMaker Execution Role
 ```bash
