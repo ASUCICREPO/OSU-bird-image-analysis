@@ -163,7 +163,7 @@ SAGEMAKER_REGION=us-west-2
 
 ---
 
-## Step 7: Deploy Everything to Cloud
+## Step 7: Deploy Backend to Cloud
 
 ```bash
 npx ampx sandbox --profile test-account --outputs-out-dir ./
@@ -173,16 +173,26 @@ npx ampx sandbox --profile test-account --outputs-out-dir ./
 - Creates S3 bucket for storage
 - Deploys Lambda function for image processing
 - Creates SageMaker notebook instance
-- Deploys frontend to Amplify Hosting
 - Configures all IAM roles and permissions
 
 **Deployment time:** 5-10 minutes
 
-**Output:** You'll get a **public URL** at the end (e.g., `https://xxxxx.amplifyapp.com`)
+**Important:** Keep this terminal open or run `npx ampx sandbox --once` to deploy and exit.
 
 ---
 
-## Step 8: Upload SageMaker Script
+## Step 8: Commit amplify_outputs.json
+
+```bash
+# Add amplify_outputs.json to git for version control
+git add amplify_outputs.json
+git commit -m "Add amplify outputs"
+git push origin main
+```
+
+---
+
+## Step 9: Upload SageMaker Script
 
 ```bash
 # Get bucket name from deployment output
@@ -194,9 +204,90 @@ aws s3 cp sagemaker/bird_species_counter_production.py s3://$BUCKET_NAME/scripts
 
 ---
 
-## Step 9: Test the System
+## Step 10: Deploy Frontend to S3 (Public URL)
 
-1. Open the public URL from Step 7
+### 10.1: Login to AWS SSO (if using SSO profile)
+```bash
+aws sso login --profile test-account
+```
+
+### 10.2: Build the Frontend
+```bash
+npm run build
+```
+
+This creates a `dist/` folder with your production-ready frontend.
+
+### 10.3: Create S3 Bucket for Website Hosting
+```bash
+# Create bucket with unique name
+export BUCKET_NAME="bird-app-$(date +%s)"
+aws s3 mb s3://$BUCKET_NAME --region us-west-2 --profile test-account
+
+# Save bucket name for later use
+echo $BUCKET_NAME > bucket_name.txt
+```
+
+### 10.4: Enable Static Website Hosting
+```bash
+aws s3 website s3://$BUCKET_NAME \
+  --index-document index.html \
+  --error-document index.html \
+  --profile test-account
+```
+
+### 10.5: Remove Public Access Block
+```bash
+aws s3api put-public-access-block \
+  --bucket $BUCKET_NAME \
+  --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
+  --profile test-account
+```
+
+### 10.6: Make Bucket Public
+```bash
+aws s3api put-bucket-policy \
+  --bucket $BUCKET_NAME \
+  --policy "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [{
+      \"Sid\": \"PublicReadGetObject\",
+      \"Effect\": \"Allow\",
+      \"Principal\": \"*\",
+      \"Action\": \"s3:GetObject\",
+      \"Resource\": \"arn:aws:s3:::$BUCKET_NAME/*\"
+    }]
+  }" \
+  --profile test-account
+```
+
+### 10.7: Upload Frontend Files
+```bash
+aws s3 sync dist/ s3://$BUCKET_NAME/ --profile test-account
+```
+
+### 10.8: Get Your Public URL
+```bash
+echo "Your app is live at: http://$BUCKET_NAME.s3-website-us-west-2.amazonaws.com"
+```
+
+**Your public URL format:**
+```
+http://bird-app-TIMESTAMP.s3-website-us-west-2.amazonaws.com
+```
+
+**To update the frontend later:**
+```bash
+export BUCKET_NAME=$(cat bucket_name.txt)
+npm run build
+aws s3 sync dist/ s3://$BUCKET_NAME/ --delete --profile test-account
+```
+
+---
+
+## Step 11: Test the System
+
+1. Open your S3 website URL from Step 10
 2. Upload a ZIP file with 5-10 bird images
 3. Wait for processing (1-2 minutes)
 4. Download the results CSV
@@ -209,6 +300,37 @@ aws logs tail /aws/lambda/amplify-birdprocessingsys-BirdProcessorFunction --foll
 # Check SageMaker notebook status
 aws sagemaker describe-notebook-instance --notebook-instance-name bird-species-classifier-notebook-v4 --profile test-account
 ```
+
+---
+
+## Step 12 (Optional): Add Custom Domain with HTTPS
+
+If you want HTTPS and a custom domain:
+
+### Using CloudFront
+```bash
+# Create CloudFront distribution pointing to your S3 bucket
+aws cloudfront create-distribution \
+  --origin-domain-name $BUCKET_NAME.s3-website-us-west-2.amazonaws.com \
+  --default-root-object index.html \
+  --profile test-account
+```
+
+Then configure your domain's DNS to point to the CloudFront URL.
+
+**Note:** The S3 website URL (HTTP) works perfectly for testing and internal use.
+
+---
+
+## Step 13 (Optional): Test Locally Before Deploying
+
+If you want to test locally first:
+
+```bash
+npm run dev
+```
+
+Open http://localhost:5173 in your browser, then proceed to Step 10 when ready.
 
 ---
 
@@ -232,6 +354,41 @@ aws sagemaker describe-notebook-instance --notebook-instance-name bird-species-c
 ---
 
 ## Troubleshooting
+
+### Issue: AWS SSO Token Expired
+**Symptom:** `Error when retrieving token from sso: Token has expired`
+
+**Solution:**
+```bash
+aws sso login --profile test-account
+```
+
+### Issue: S3 Website URL Not Accessible
+**Symptom:** 403 Forbidden or Access Denied
+
+**Solution:**
+1. Verify public access block is disabled:
+   ```bash
+   aws s3api get-public-access-block --bucket $BUCKET_NAME --profile test-account
+   ```
+2. Verify bucket policy is public:
+   ```bash
+   aws s3api get-bucket-policy --bucket $BUCKET_NAME --profile test-account
+   ```
+3. Verify website hosting is enabled:
+   ```bash
+   aws s3api get-bucket-website --bucket $BUCKET_NAME --profile test-account
+   ```
+4. Verify files were uploaded:
+   ```bash
+   aws s3 ls s3://$BUCKET_NAME/ --profile test-account
+   ```
+
+### Issue: Cannot Set Public Bucket Policy
+**Symptom:** `AccessDenied: public policies are prevented by BlockPublicPolicy`
+
+**Solution:**
+Run Step 10.5 to remove public access block before setting the bucket policy.
 
 ### Issue: Bedrock Throttling Errors
 **Symptom:** `ThrottlingException: Too many tokens`
@@ -273,7 +430,7 @@ aws sagemaker describe-notebook-instance --notebook-instance-name bird-species-c
 - Bedrock (Claude): $0.10 - $0.50
 - SageMaker: $0.05 - $0.10
 - S3 Storage: $0.01
-- Amplify Hosting: $0.01
+- S3 Website Hosting: $0.00 (negligible)
 - **Total**: ~$0.20 - $0.70 per 100 images
 
 **Monthly costs (1000 images/month):**
@@ -286,20 +443,46 @@ aws sagemaker describe-notebook-instance --notebook-instance-name bird-species-c
 To delete all resources:
 
 ```bash
-# Delete Amplify app
+# 1. Delete sandbox backend
 npx ampx sandbox delete --profile test-account
 
-# Delete S3 buckets
-aws s3 rm s3://YOUR-BUCKET-NAME --recursive --profile test-account
-aws s3 rb s3://YOUR-BUCKET-NAME --profile test-account
+# 2. Delete frontend S3 bucket
+export BUCKET_NAME=$(cat bucket_name.txt)
+aws s3 rm s3://$BUCKET_NAME --recursive --profile test-account
+aws s3 rb s3://$BUCKET_NAME --profile test-account
 
-# Delete SageMaker model
-aws sagemaker delete-model --model-name bird-species-detection-model-i107-fr-1l --profile test-account
+# 3. Delete storage S3 bucket (from amplify_outputs.json)
+STORAGE_BUCKET=$(cat amplify_outputs.json | grep -o '"bucket_name":"[^"]*' | cut -d'"' -f4)
+aws s3 rm s3://$STORAGE_BUCKET --recursive --profile test-account
+aws s3 rb s3://$STORAGE_BUCKET --profile test-account
 
-# Delete IAM role
+# 4. Delete SageMaker model
+aws sagemaker delete-model --model-name bird-species-detection-model-i107-fr-1l --profile test-account --region us-west-2
+
+# 5. Delete IAM role
 aws iam detach-role-policy --role-name SageMakerExecutionRole --policy-arn arn:aws:iam::aws:policy/AmazonSageMakerFullAccess --profile test-account
 aws iam delete-role --role-name SageMakerExecutionRole --profile test-account
 ```
+
+---
+
+## Architecture Summary
+
+**Backend (Sandbox):**
+- Lambda function (bird processing)
+- S3 bucket (storage)
+- SageMaker notebook (species classification)
+- Cognito (authentication)
+
+**Frontend (Amplify Hosting):**
+- React app hosted on CloudFront CDN
+- Public URL: `https://main.xxxxx.amplifyapp.com`
+- Connects to sandbox backend via `amplify_outputs.json`
+
+**Why this approach?**
+- Backend via sandbox: Easy local development and testing
+- Frontend via Amplify Hosting: Public URL for client access
+- Best of both worlds: Development flexibility + Production accessibility
 
 ---
 

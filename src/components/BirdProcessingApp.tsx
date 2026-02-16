@@ -4,7 +4,6 @@ import { S3FileUploader } from './S3FileUploader'
 import { EnhancedCSVViewer } from './EnhancedCSVViewer'
 
 export function BirdProcessingApp() {
-  const [enhancedCSVs, setEnhancedCSVs] = useState<any[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
 
   const handleFileUpload = (_files: File[]) => {
@@ -26,7 +25,7 @@ export function BirdProcessingApp() {
         item.key?.includes('enhanced_bird_results') && item.key?.endsWith('.csv')
       )
       
-      const csvData = await Promise.all(
+      await Promise.all(
         csvFiles.map(async (file) => {
           const url = await getUrl({ key: file.key! })
           return {
@@ -38,9 +37,6 @@ export function BirdProcessingApp() {
         })
       )
       
-      setEnhancedCSVs(csvData.sort((a, b) => 
-        new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime()
-      ))
       setIsProcessing(false)
     } catch (error) {
       console.error('Error polling for results:', error)
@@ -52,10 +48,6 @@ export function BirdProcessingApp() {
     // Load existing results on component mount
     pollForResults()
   }, [])
-
-  const downloadCSV = (csv: any) => {
-    window.open(csv.downloadUrl, '_blank')
-  }
 
   return (
     <div className="app-container">
