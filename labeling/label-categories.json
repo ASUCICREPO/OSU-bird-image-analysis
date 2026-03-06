@@ -1,0 +1,11 @@
+{
+  "document-version": "2018-11-28",
+  "labels": [
+    { "label": "pigeon" },
+    { "label": "dove" },
+    { "label": "starling" },
+    { "label": "sparrow" },
+    { "label": "blackbird" },
+    { "label": "crow" }
+  ]
+}
